@@ -1,0 +1,15 @@
+{
+  "name": "fly-book",
+  "version": "1.0.0",
+  "description": "团队即时通讯产品",
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build:client": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": ["im", "chat", "socket"],
+  "author": "",
+  "license": "MIT"
+}
