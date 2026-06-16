@@ -2,7 +2,22 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, AuthResponse } from '../types'
 import { getMe, logout as apiLogout } from '../api/auth'
-import { removeToken } from '../api/client'
+import { setToken as setCachedToken, removeToken } from '../api/client'
+
+const AUTH_KEY = 'flybook_auth'
+
+function getTokenFromPersistStorage(): string | null {
+  try {
+    const stored = localStorage.getItem(AUTH_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return parsed?.state?.token || parsed?.token || null
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
 
 interface AuthState {
   user: User | null
@@ -24,6 +39,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
 
       login: (data: AuthResponse) => {
+        setCachedToken(data.token)
         set({
           user: data.user,
           token: data.token,
@@ -51,22 +67,18 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         try {
-          const stored = localStorage.getItem('flybook_auth')
-          if (!stored) {
-            set({ isAuthenticated: false, user: null, token: null })
-            return false
-          }
-          const parsed = JSON.parse(stored)
-          if (!parsed.token) {
+          const token = getTokenFromPersistStorage()
+          if (!token) {
             set({ isAuthenticated: false, user: null, token: null })
             return false
           }
           set({ isLoading: true })
+          setCachedToken(token)
           const user = await getMe()
           if (user) {
             set({
               user,
-              token: parsed.token,
+              token,
               isAuthenticated: true,
               isLoading: false
             })
@@ -93,7 +105,7 @@ export const useAuthStore = create<AuthState>()(
       }
     }),
     {
-      name: 'flybook_auth',
+      name: AUTH_KEY,
       partialize: (state) => ({
         user: state.user,
         token: state.token,

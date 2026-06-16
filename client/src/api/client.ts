@@ -3,6 +3,8 @@ import type { ApiResponse } from '../types'
 
 const AUTH_KEY = 'flybook_auth'
 
+let cachedToken: string | null = null
+
 const client: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
@@ -11,12 +13,12 @@ const client: AxiosInstance = axios.create({
   }
 })
 
-function getTokenFromStorage(): string | null {
+function getTokenFromPersistStorage(): string | null {
   try {
     const stored = localStorage.getItem(AUTH_KEY)
     if (stored) {
       const parsed = JSON.parse(stored)
-      return parsed.token || null
+      return parsed?.state?.token || parsed?.token || null
     }
   } catch {
     // ignore
@@ -24,9 +26,17 @@ function getTokenFromStorage(): string | null {
   return null
 }
 
+function initCachedToken(): void {
+  if (!cachedToken) {
+    cachedToken = getTokenFromPersistStorage()
+  }
+}
+
+initCachedToken()
+
 client.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = getTokenFromStorage()
+    const token = cachedToken || getTokenFromPersistStorage()
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -47,6 +57,7 @@ client.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
+      cachedToken = null
       localStorage.removeItem(AUTH_KEY)
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         window.location.href = '/login'
@@ -57,21 +68,15 @@ client.interceptors.response.use(
 )
 
 export function getToken(): string | null {
-  return getTokenFromStorage()
+  return cachedToken || getTokenFromPersistStorage()
 }
 
 export function setToken(token: string): void {
-  try {
-    const stored = localStorage.getItem(AUTH_KEY)
-    const parsed = stored ? JSON.parse(stored) : {}
-    parsed.token = token
-    localStorage.setItem(AUTH_KEY, JSON.stringify(parsed))
-  } catch {
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ token }))
-  }
+  cachedToken = token
 }
 
 export function removeToken(): void {
+  cachedToken = null
   localStorage.removeItem(AUTH_KEY)
 }
 
