@@ -34,7 +34,8 @@ export const useSocketStore = create<SocketState>()((set, get) => ({
       existingSocket.disconnect()
     }
 
-    const socket = io('/socket.io', {
+    const socket = io('/', {
+      path: '/socket.io',
       auth: { token },
       transports: ['websocket', 'polling']
     })

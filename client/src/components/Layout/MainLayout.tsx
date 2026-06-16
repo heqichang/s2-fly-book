@@ -8,20 +8,54 @@ import ContactList from '../Contacts/ContactList'
 
 function MainLayout() {
   const { user, token, isAuthenticated } = useAuthStore()
-  const { initSocket, disconnectSocket } = useSocketStore()
+  const socketConnected = useSocketStore((s) => s.connected)
   const location = useLocation()
 
   const isChats = location.pathname.startsWith('/chats')
   const isContacts = location.pathname.startsWith('/contacts')
 
   useEffect(() => {
-    if (isAuthenticated && token && user?.id) {
-      initSocket(token, user.id)
+    let connected = false
+    let timerId: ReturnType<typeof setInterval> | null = null
+
+    const tryInitSocket = () => {
+      const authState = useAuthStore.getState()
+      const socketState = useSocketStore.getState()
+      if (
+        authState.isAuthenticated &&
+        authState.token &&
+        authState.user?.id &&
+        !socketState.socket
+      ) {
+        socketState.initSocket(authState.token, authState.user.id)
+        connected = true
+        if (timerId) {
+          clearInterval(timerId)
+          timerId = null
+        }
+      }
     }
+
+    tryInitSocket()
+
+    if (!connected) {
+      timerId = setInterval(tryInitSocket, 500)
+      setTimeout(() => {
+        if (timerId) {
+          clearInterval(timerId)
+          timerId = null
+        }
+      }, 5000)
+    }
+
     return () => {
-      disconnectSocket()
+      if (timerId) {
+        clearInterval(timerId)
+        timerId = null
+      }
+      useSocketStore.getState().disconnectSocket()
     }
-  }, [isAuthenticated, token, user?.id, initSocket, disconnectSocket])
+  }, [])
 
   const navItems = [
     {
