@@ -73,15 +73,27 @@ router.post('/', auth, async (req, res) => {
     const existing = await prisma.conversation.findFirst({
       where: {
         type: 'single',
-        members: {
-          every: {
-            userId: {
-              in: [userId, withUserId]
+        AND: [
+          {
+            members: {
+              every: {
+                userId: {
+                  in: [userId, withUserId]
+                }
+              }
             }
           },
-          some: { userId },
-          AND: { some: { userId: withUserId } }
-        }
+          {
+            members: {
+              some: { userId }
+            }
+          },
+          {
+            members: {
+              some: { userId: withUserId }
+            }
+          }
+        ]
       },
       include: {
         members: {
