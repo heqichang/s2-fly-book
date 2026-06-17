@@ -5,13 +5,16 @@ import { useSocketStore } from '../../store/socket'
 import Avatar from '../common/Avatar'
 import ConversationList from '../Chat/ConversationList'
 import ContactList from '../Contacts/ContactList'
+import TeamList from '../Team/TeamList'
+import DepartmentTree from '../Department/DepartmentTree'
 
 function MainLayout() {
-  const { user, token, isAuthenticated } = useAuthStore()
-  const socketConnected = useSocketStore((s) => s.connected)
+  const { user } = useAuthStore()
   const location = useLocation()
 
   const isChats = location.pathname.startsWith('/chats')
+  const isTeams = location.pathname.startsWith('/teams')
+  const isOrganization = location.pathname.startsWith('/organization')
   const isContacts = location.pathname.startsWith('/contacts')
 
   useEffect(() => {
@@ -67,6 +70,26 @@ function MainLayout() {
       ),
       label: '消息',
       badge: true
+    },
+    {
+      to: '/teams',
+      icon: (active: boolean) => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+      label: '团队',
+      badge: false
+    },
+    {
+      to: '/organization',
+      icon: (active: boolean) => (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+        </svg>
+      ),
+      label: '组织',
+      badge: false
     },
     {
       to: '/contacts',
@@ -132,6 +155,18 @@ function MainLayout() {
       {isChats && (
         <div className="w-[320px] bg-[#f5f6f7] flex flex-col flex-shrink-0 border-r border-gray-100">
           <ConversationList />
+        </div>
+      )}
+
+      {isTeams && (
+        <div className="w-[320px] bg-[#f5f6f7] flex flex-col flex-shrink-0 border-r border-gray-100">
+          <TeamList />
+        </div>
+      )}
+
+      {isOrganization && (
+        <div className="w-[320px] bg-[#f5f6f7] flex flex-col flex-shrink-0 border-r border-gray-100">
+          <DepartmentTree />
         </div>
       )}
 

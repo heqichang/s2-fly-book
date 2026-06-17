@@ -47,9 +47,9 @@ const setupSocketHandlers = (io) => {
 
     socket.on('send_message', async (data) => {
       try {
-        const { conversationId, content, type = 'text' } = data
+        const { conversationId, content, type = 'text', replyToId, forwardFromId, mentions, fileId } = data
 
-        if (!conversationId || !content) return
+        if (!conversationId || (!content && !fileId)) return
 
         const member = await prisma.conversationMember.findUnique({
           where: {
@@ -68,7 +68,9 @@ const setupSocketHandlers = (io) => {
               conversationId,
               senderId: socket.userId,
               type,
-              content
+              content: content || '',
+              replyToId,
+              forwardFromId
             },
             include: {
               sender: {
@@ -77,14 +79,48 @@ const setupSocketHandlers = (io) => {
                   nickname: true,
                   avatar: true
                 }
-              }
+              },
+              replyTo: replyToId ? {
+                select: {
+                  id: true,
+                  content: true,
+                  type: true,
+                  isRecalled: true,
+                  sender: {
+                    select: {
+                      id: true,
+                      nickname: true
+                    }
+                  }
+                }
+              } : undefined,
+              file: fileId ? true : undefined
             }
           })
+
+          if (fileId) {
+            await tx.file.update({
+              where: { id: fileId },
+              data: { messageId: msg.id }
+            })
+          }
+
+          if (mentions && Array.isArray(mentions) && mentions.length > 0) {
+            for (const mention of mentions) {
+              await tx.messageMention.create({
+                data: {
+                  messageId: msg.id,
+                  userId: mention.userId,
+                  isAll: mention.isAll || false
+                }
+              })
+            }
+          }
 
           await tx.conversation.update({
             where: { id: conversationId },
             data: {
-              lastMessage: content,
+              lastMessage: type === 'text' ? content : `[${type === 'image' ? '图片' : type === 'file' ? '文件' : '消息'}]`,
               lastMessageAt: msg.createdAt
             }
           })
@@ -180,6 +216,8 @@ const setupSocketHandlers = (io) => {
 
         if (!member) return
 
+        const unreadCount = member.unreadCount
+
         await prisma.conversationMember.update({
           where: { id: member.id },
           data: {
@@ -187,6 +225,36 @@ const setupSocketHandlers = (io) => {
             lastReadAt: new Date()
           }
         })
+
+        const unreadMessages = await prisma.message.findMany({
+          where: {
+            conversationId,
+            senderId: { not: socket.userId },
+            isDeleted: false,
+            isRecalled: false
+          },
+          orderBy: { createdAt: 'desc' },
+          take: unreadCount
+        })
+
+        for (const msg of unreadMessages) {
+          const existing = await prisma.readReceipt.findUnique({
+            where: {
+              messageId_userId: {
+                messageId: msg.id,
+                userId: socket.userId
+              }
+            }
+          })
+          if (!existing) {
+            await prisma.readReceipt.create({
+              data: {
+                messageId: msg.id,
+                userId: socket.userId
+              }
+            })
+          }
+        }
 
         const otherMembers = await prisma.conversationMember.findMany({
           where: {
@@ -206,6 +274,255 @@ const setupSocketHandlers = (io) => {
         }
       } catch (error) {
         console.error('标记已读失败:', error)
+      }
+    })
+
+    socket.on('recall_message', async (data) => {
+      try {
+        const { conversationId, messageId } = data
+
+        if (!conversationId || !messageId) return
+
+        const message = await prisma.message.findUnique({
+          where: { id: messageId }
+        })
+
+        if (!message || message.senderId !== socket.userId || message.isRecalled) return
+
+        const now = new Date()
+        const createdAt = new Date(message.createdAt)
+        const diffMinutes = (now - createdAt) / (1000 * 60)
+
+        if (diffMinutes > 2) return
+
+        await prisma.message.update({
+          where: { id: messageId },
+          data: {
+            isRecalled: true,
+            content: '消息已撤回'
+          }
+        })
+
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId }
+        })
+
+        for (const m of members) {
+          const socketId = onlineUsers.get(m.userId)
+          if (socketId) {
+            io.to(socketId).emit('message_recalled', {
+              conversationId,
+              messageId
+            })
+          }
+        }
+      } catch (error) {
+        console.error('撤回消息失败:', error)
+      }
+    })
+
+    socket.on('delete_message', async (data) => {
+      try {
+        const { conversationId, messageId } = data
+
+        if (!conversationId || !messageId) return
+
+        const message = await prisma.message.findUnique({
+          where: { id: messageId }
+        })
+
+        const member = await prisma.conversationMember.findUnique({
+          where: {
+            conversationId_userId: {
+              conversationId,
+              userId: socket.userId
+            }
+          }
+        })
+
+        const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } })
+        const isAdmin = conversation.type === 'group' && member && ['owner', 'admin'].includes(member.role)
+
+        if (!message || message.isDeleted) return
+        if (message.senderId !== socket.userId && !isAdmin) return
+
+        await prisma.message.update({
+          where: { id: messageId },
+          data: { isDeleted: true }
+        })
+
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId }
+        })
+
+        for (const m of members) {
+          const socketId = onlineUsers.get(m.userId)
+          if (socketId) {
+            io.to(socketId).emit('message_deleted', {
+              conversationId,
+              messageId
+            })
+          }
+        }
+      } catch (error) {
+        console.error('删除消息失败:', error)
+      }
+    })
+
+    socket.on('pin_message', async (data) => {
+      try {
+        const { conversationId, messageId } = data
+
+        if (!conversationId || !messageId) return
+
+        const member = await prisma.conversationMember.findUnique({
+          where: {
+            conversationId_userId: {
+              conversationId,
+              userId: socket.userId
+            }
+          }
+        })
+
+        if (!member) return
+
+        const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } })
+        if (conversation.type === 'group' && member.role === 'member') return
+
+        const message = await prisma.message.findUnique({
+          where: { id: messageId }
+        })
+
+        if (!message || message.conversationId !== conversationId || message.isDeleted || message.isRecalled) return
+
+        const existingPin = await prisma.pinnedMessage.findUnique({
+          where: {
+            conversationId_messageId: {
+              conversationId,
+              messageId
+            }
+          }
+        })
+
+        if (existingPin) return
+
+        const pinnedMessage = await prisma.pinnedMessage.create({
+          data: {
+            conversationId,
+            messageId,
+            pinnedById: socket.userId
+          },
+          include: {
+            message: {
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    avatar: true
+                  }
+                }
+              }
+            },
+            pinnedBy: {
+              select: {
+                id: true,
+                nickname: true,
+                avatar: true
+              }
+            }
+          }
+        })
+
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId }
+        })
+
+        for (const m of members) {
+          const socketId = onlineUsers.get(m.userId)
+          if (socketId) {
+            io.to(socketId).emit('message_pinned', {
+              conversationId,
+              pinnedMessage
+            })
+          }
+        }
+      } catch (error) {
+        console.error('置顶消息失败:', error)
+      }
+    })
+
+    socket.on('unpin_message', async (data) => {
+      try {
+        const { conversationId, messageId } = data
+
+        if (!conversationId || !messageId) return
+
+        const member = await prisma.conversationMember.findUnique({
+          where: {
+            conversationId_userId: {
+              conversationId,
+              userId: socket.userId
+            }
+          }
+        })
+
+        if (!member) return
+
+        const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } })
+        if (conversation.type === 'group' && member.role === 'member') return
+
+        const pinnedMessage = await prisma.pinnedMessage.findUnique({
+          where: {
+            conversationId_messageId: {
+              conversationId,
+              messageId
+            }
+          }
+        })
+
+        if (!pinnedMessage) return
+
+        await prisma.pinnedMessage.delete({
+          where: {
+            conversationId_messageId: {
+              conversationId,
+              messageId
+            }
+          }
+        })
+
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId }
+        })
+
+        for (const m of members) {
+          const socketId = onlineUsers.get(m.userId)
+          if (socketId) {
+            io.to(socketId).emit('message_unpinned', {
+              conversationId,
+              messageId
+            })
+          }
+        }
+      } catch (error) {
+        console.error('取消置顶失败:', error)
+      }
+    })
+
+    socket.on('join_conversation', (data) => {
+      const { conversationId } = data
+      if (conversationId) {
+        socket.join(`conversation:${conversationId}`)
+        console.log(`用户 ${socket.userId} 加入会话房间: ${conversationId}`)
+      }
+    })
+
+    socket.on('leave_conversation', (data) => {
+      const { conversationId } = data
+      if (conversationId) {
+        socket.leave(`conversation:${conversationId}`)
+        console.log(`用户 ${socket.userId} 离开会话房间: ${conversationId}`)
       }
     })
 

@@ -1,17 +1,33 @@
 import { create } from 'zustand'
 import { io, Socket } from 'socket.io-client'
-import type { Message, FriendRequest } from '../types'
+import type { Message, FriendRequest, PinnedMessage, ReadReceipt } from '../types'
 
-type NewMessageHandler = (message: Message) => void
+type NewMessageHandler = (data: { conversationId: string; message: Message }) => void
 type FriendRequestReceivedHandler = (request: FriendRequest) => void
 type FriendRequestAcceptedHandler = (request: FriendRequest) => void
 type OnlineStatusHandler = (data: { userId: string; online: boolean }) => void
+type MessageRecalledHandler = (data: { conversationId: string; messageId: string }) => void
+type MessageDeletedHandler = (data: { conversationId: string; messageId: string }) => void
+type MessagePinnedHandler = (data: { conversationId: string; pinnedMessage: PinnedMessage }) => void
+type MessageUnpinnedHandler = (data: { conversationId: string; messageId: string }) => void
+type MessageReadHandler = (data: { conversationId: string; readReceipt: ReadReceipt }) => void
+type ConversationUpdatedHandler = (data: { conversationId: string }) => void
+type MemberJoinedHandler = (data: { conversationId: string; memberId: string }) => void
+type MemberLeftHandler = (data: { conversationId: string; memberId: string }) => void
 
 type SocketEventHandler =
   | { event: 'new_message'; handler: NewMessageHandler }
   | { event: 'friend_request_received'; handler: FriendRequestReceivedHandler }
   | { event: 'friend_request_accepted'; handler: FriendRequestAcceptedHandler }
   | { event: 'online_status'; handler: OnlineStatusHandler }
+  | { event: 'message_recalled'; handler: MessageRecalledHandler }
+  | { event: 'message_deleted'; handler: MessageDeletedHandler }
+  | { event: 'message_pinned'; handler: MessagePinnedHandler }
+  | { event: 'message_unpinned'; handler: MessageUnpinnedHandler }
+  | { event: 'message_read'; handler: MessageReadHandler }
+  | { event: 'conversation_updated'; handler: ConversationUpdatedHandler }
+  | { event: 'member_joined'; handler: MemberJoinedHandler }
+  | { event: 'member_left'; handler: MemberLeftHandler }
 
 interface SocketState {
   socket: Socket | null

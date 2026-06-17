@@ -6,6 +6,8 @@ import Register from './pages/Register'
 import ChatPage from './pages/ChatPage'
 import ContactsPage from './pages/ContactsPage'
 import ProfilePage from './pages/ProfilePage'
+import TeamsPage from './pages/TeamsPage'
+import OrganizationPage from './pages/OrganizationPage'
 
 function App() {
   return (
@@ -24,6 +26,10 @@ function App() {
         <Route index element={<Navigate to="/chats" replace />} />
         <Route path="chats" element={<ChatPage />} />
         <Route path="chats/:id" element={<ChatPage />} />
+        <Route path="teams" element={<TeamsPage />} />
+        <Route path="teams/:id" element={<TeamsPage />} />
+        <Route path="organization" element={<OrganizationPage />} />
+        <Route path="organization/:departmentId" element={<OrganizationPage />} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>

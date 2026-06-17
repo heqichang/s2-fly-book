@@ -14,6 +14,7 @@ model User {
   nickname  String
   avatar    String?
   status    String   @default("offline")
+  phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -24,6 +25,12 @@ model User {
   conversationMembers    ConversationMember[] @relation("ConversationMembers")
   messages               Message[]
   readReceipts           ReadReceipt[]
+  teamMembers            TeamMember[]
+  departmentMembers      DepartmentMember[]
+  ownedTeams             Team[]               @relation("TeamOwner")
+  createdFiles           File[]
+  pinnedMessages         PinnedMessage[]
+  messageMentions        MessageMention[]
 }
 
 model FriendRequest {
@@ -53,26 +60,92 @@ model Contact {
   @@unique([userId, contactId])
 }
 
+model Team {
+  id          String         @id @default(uuid())
+  name        String
+  logo        String?
+  description String?
+  ownerId     String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  owner       User           @relation("TeamOwner", fields: [ownerId], references: [id])
+  members     TeamMember[]
+  departments Department[]
+  conversations Conversation[]
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  userId    String
+  role      String   @default("member")
+  joinedAt  DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model Department {
+  id             String               @id @default(uuid())
+  teamId         String
+  name           String
+  parentId       String?
+  description    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  team           Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  parent         Department?          @relation("DepartmentParent", fields: [parentId], references: [id])
+  children       Department[]         @relation("DepartmentParent")
+  members        DepartmentMember[]
+}
+
+model DepartmentMember {
+  id             String   @id @default(uuid())
+  departmentId   String
+  userId         String
+  position       String?
+  phone          String?
+  email          String?
+  joinedAt       DateTime @default(now())
+
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, userId])
+}
+
 model Conversation {
   id             String        @id @default(uuid())
   type           String        @default("single")
+  subtype        String?
   name           String?
+  avatar         String?
+  announcement   String?
+  teamId         String?
+  departmentId   String?
   lastMessage    String?
   lastMessageAt  DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  team           Team?         @relation(fields: [teamId], references: [id])
   members        ConversationMember[]
   messages       Message[]
+  pinnedMessages PinnedMessage[]
 }
 
 model ConversationMember {
   id             String        @id @default(uuid())
   conversationId String
   userId         String
+  role           String        @default("member")
   unreadCount    Int           @default(0)
   lastReadAt     DateTime?
-  createdAt      DateTime      @default(now())
+  joinedAt       DateTime      @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation("ConversationMembers", fields: [userId], references: [id], onDelete: Cascade)
@@ -87,12 +160,48 @@ model Message {
   type           String        @default("text")
   content        String
   status         String        @default("sent")
+  isRecalled     Boolean       @default(false)
+  isDeleted      Boolean       @default(false)
+  replyToId      String?
+  forwardFromId  String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo        Message?      @relation("MessageReply", fields: [replyToId], references: [id])
+  replies        Message[]     @relation("MessageReply")
+  forwardFrom    Message?      @relation("MessageForward", fields: [forwardFromId], references: [id])
+  forwards       Message[]     @relation("MessageForward")
+  file           File?
+  mentions       MessageMention[]
+  readReceipts   ReadReceipt[]
+  pinnedMessages PinnedMessage[]
+}
+
+model MessageMention {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  isAll     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PinnedMessage {
+  id           String   @id @default(uuid())
+  conversationId String
+  messageId    String
+  pinnedById   String
+  createdAt    DateTime @default(now())
+
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  readReceipts ReadReceipt[]
+  message      Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  pinnedBy     User         @relation(fields: [pinnedById], references: [id])
+
+  @@unique([conversationId, messageId])
 }
 
 model ReadReceipt {
@@ -105,4 +214,21 @@ model ReadReceipt {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
+}
+
+model File {
+  id          String   @id @default(uuid())
+  name        String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  thumbnail   String?
+  messageId   String?  @unique
+  uploadedById String
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  message     Message? @relation(fields: [messageId], references: [id])
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id])
 }

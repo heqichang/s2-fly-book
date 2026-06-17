@@ -8,6 +8,9 @@ import authRouter from './routes/auth.js'
 import usersRouter from './routes/users.js'
 import contactsRouter from './routes/contacts.js'
 import conversationsRouter from './routes/conversations.js'
+import teamsRouter from './routes/teams.js'
+import departmentsRouter from './routes/departments.js'
+import filesRouter from './routes/files.js'
 
 import { setupSocketHandlers } from './socket/handler.js'
 
@@ -44,6 +47,9 @@ app.use('/api/auth', authRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/contacts', contactsRouter)
 app.use('/api/conversations', conversationsRouter)
+app.use('/api/teams', teamsRouter)
+app.use('/api/departments', departmentsRouter)
+app.use('/api/files', filesRouter)
 
 app.use((err, req, res, next) => {
   console.error(err.stack)
