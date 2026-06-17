@@ -78,3 +78,39 @@ export function deleteTeam(id: string) {
     url: `/teams/${id}`
   })
 }
+
+export function searchTeams(keyword: string) {
+  return request<Array<{
+    id: string
+    name: string
+    logo?: string | null
+    description?: string | null
+    ownerId: string
+    owner?: { id: string; nickname: string; avatar?: string | null }
+    memberCount: number
+    hasJoined: boolean
+    createdAt: string
+  }>>({
+    method: 'GET',
+    url: '/teams/search/list',
+    params: { keyword }
+  })
+}
+
+export interface InviteMembersRequest {
+  userIds: string[]
+}
+
+export interface InviteMembersResponse {
+  message: string
+  addedCount: number
+  members?: TeamMember[]
+}
+
+export function inviteTeamMembers(id: string, data: InviteMembersRequest) {
+  return request<InviteMembersResponse>({
+    method: 'POST',
+    url: `/teams/${id}/members/invite`,
+    data
+  })
+}

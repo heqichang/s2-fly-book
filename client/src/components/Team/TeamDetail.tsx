@@ -13,6 +13,7 @@ import Avatar from '../common/Avatar'
 import useToast from '../../hooks/useToast'
 import Toast from '../common/Toast'
 import { useAuthStore } from '../../store/auth'
+import InviteMembersModal from './InviteMembersModal'
 
 interface TeamDetailProps {
   teamId: string
@@ -43,6 +44,7 @@ function TeamDetail({ teamId, onTeamLeft, onTeamUpdated }: TeamDetailProps) {
   const [actionLoadingIds, setActionLoadingIds] = useState<Set<string>>(new Set())
   const [leaveModal, setLeaveModal] = useState(false)
   const [removeMemberModal, setRemoveMemberModal] = useState<{ show: boolean; member: TeamMember | null }>({ show: false, member: null })
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const { user: currentUser } = useAuthStore()
   const { toast, showToast, hideToast } = useToast()
 
@@ -311,6 +313,17 @@ function TeamDetail({ teamId, onTeamLeft, onTeamUpdated }: TeamDetailProps) {
               <div className="flex items-center space-x-2">
                 {isAdmin && (
                   <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="px-4 py-2 bg-[#3370FF] hover:bg-[#2a5fd9] text-white rounded-lg text-sm font-medium transition-all flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    邀请成员
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
                     onClick={handleStartEdit}
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-all flex items-center"
                   >
@@ -460,6 +473,13 @@ function TeamDetail({ teamId, onTeamLeft, onTeamUpdated }: TeamDetailProps) {
           </div>
         </div>
       )}
+
+      <InviteMembersModal
+        teamId={teamId}
+        visible={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onInvited={loadTeamData}
+      />
     </>
   )
 }

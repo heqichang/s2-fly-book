@@ -5,16 +5,12 @@ import { useSocketStore } from '../../store/socket'
 import Avatar from '../common/Avatar'
 import ConversationList from '../Chat/ConversationList'
 import ContactList from '../Contacts/ContactList'
-import TeamList from '../Team/TeamList'
-import DepartmentTree from '../Department/DepartmentTree'
 
 function MainLayout() {
   const { user } = useAuthStore()
   const location = useLocation()
 
   const isChats = location.pathname.startsWith('/chats')
-  const isTeams = location.pathname.startsWith('/teams')
-  const isOrganization = location.pathname.startsWith('/organization')
   const isContacts = location.pathname.startsWith('/contacts')
 
   useEffect(() => {
@@ -155,18 +151,6 @@ function MainLayout() {
       {isChats && (
         <div className="w-[320px] bg-[#f5f6f7] flex flex-col flex-shrink-0 border-r border-gray-100">
           <ConversationList />
-        </div>
-      )}
-
-      {isTeams && (
-        <div className="w-[320px] bg-[#f5f6f7] flex flex-col flex-shrink-0 border-r border-gray-100">
-          <TeamList />
-        </div>
-      )}
-
-      {isOrganization && (
-        <div className="w-[320px] bg-[#f5f6f7] flex flex-col flex-shrink-0 border-r border-gray-100">
-          <DepartmentTree />
         </div>
       )}
 

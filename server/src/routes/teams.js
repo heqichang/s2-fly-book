@@ -559,4 +559,149 @@ router.delete('/:id', auth, async (req, res) => {
   }
 })
 
+router.get('/search/list', auth, async (req, res) => {
+  try {
+    const { keyword } = req.query
+    const userId = req.user.userId
+
+    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+      return res.json({ success: true, data: [] })
+    }
+
+    const teams = await prisma.team.findMany({
+      where: {
+        OR: [
+          { name: { contains: keyword.trim() } },
+          { description: { contains: keyword.trim() } }
+        ]
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            nickname: true,
+            avatar: true
+          }
+        },
+        _count: {
+          select: { members: true }
+        }
+      },
+      take: 50
+    })
+
+    const myTeamIds = await prisma.teamMember.findMany({
+      where: { userId },
+      select: { teamId: true }
+    }).then(arr => new Set(arr.map(m => m.teamId)))
+
+    const data = teams.map(t => ({
+      id: t.id,
+      name: t.name,
+      logo: t.logo,
+      description: t.description,
+      ownerId: t.ownerId,
+      owner: t.owner,
+      memberCount: t._count.members,
+      hasJoined: myTeamIds.has(t.id),
+      createdAt: t.createdAt
+    }))
+
+    res.json({ success: true, data })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.post('/:id/members/invite', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { userIds } = req.body
+    const userId = req.user.userId
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ success: false, message: '请选择要邀请的用户' })
+    }
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: {
+        teamId_userId: {
+          teamId: id,
+          userId
+        }
+      }
+    })
+
+    if (!teamMember) {
+      return res.status(403).json({ success: false, message: '您不是该团队成员' })
+    }
+
+    if (teamMember.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '只有管理员可以邀请成员' })
+    }
+
+    const existing = await prisma.teamMember.findMany({
+      where: {
+        teamId: id,
+        userId: { in: userIds }
+      }
+    })
+    const existingUserIds = new Set(existing.map(m => m.userId))
+
+    const newUserIds = userIds.filter(uid => !existingUserIds.has(uid))
+
+    if (newUserIds.length === 0) {
+      return res.json({ success: true, data: { message: '用户已是团队成员', addedCount: 0 } })
+    }
+
+    await prisma.teamMember.createMany({
+      data: newUserIds.map(uid => ({
+        teamId: id,
+        userId: uid,
+        role: 'member'
+      }))
+    })
+
+    const members = await prisma.teamMember.findMany({
+      where: {
+        teamId: id,
+        userId: { in: newUserIds }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            avatar: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
+    })
+
+    const io = req.app.get('io')
+    const onlineUsers = req.app.get('onlineUsers')
+    for (const uid of newUserIds) {
+      const socketId = onlineUsers.get(uid)
+      if (socketId) {
+        const team = await prisma.team.findUnique({ where: { id } })
+        io.to(socketId).emit('team_joined', {
+          teamId: id,
+          team: {
+            id: team.id,
+            name: team.name,
+            logo: team.logo,
+            description: team.description
+          }
+        })
+      }
+    }
+
+    res.json({ success: true, data: { message: `成功邀请 ${members.length} 人`, addedCount: members.length, members } })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 export default router

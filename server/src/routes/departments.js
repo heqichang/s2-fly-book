@@ -462,7 +462,28 @@ router.post('/:id/members', auth, async (req, res) => {
     })
 
     if (!targetTeamMember) {
-      return res.status(400).json({ success: false, message: '用户不是该团队成员' })
+      await prisma.teamMember.create({
+        data: {
+          teamId: department.teamId,
+          userId: targetUserId,
+          role: 'member'
+        }
+      })
+
+      const io = req.app.get('io')
+      const onlineUsers = req.app.get('onlineUsers')
+      const socketId = onlineUsers.get(targetUserId)
+      if (socketId) {
+        io.to(socketId).emit('team_joined', {
+          teamId: department.teamId,
+          team: {
+            id: department.team.id,
+            name: department.team.name,
+            logo: department.team.logo,
+            description: department.team.description
+          }
+        })
+      }
     }
 
     const existingMember = await prisma.departmentMember.findUnique({

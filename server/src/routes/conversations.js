@@ -286,6 +286,99 @@ router.post('/', auth, async (req, res) => {
   }
 })
 
+router.post('/group', auth, async (req, res) => {
+  try {
+    const { name, avatar, teamId, memberIds } = req.body
+    const userId = req.user.userId
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: '请提供群名称' })
+    }
+
+    const allMemberIds = [...new Set([userId, ...(memberIds || [])])]
+
+    if (allMemberIds.length < 2) {
+      return res.status(400).json({ success: false, message: '群聊至少需要2人' })
+    }
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        type: 'group',
+        subtype: 'normal',
+        name,
+        avatar,
+        teamId,
+        members: {
+          create: allMemberIds.map((uid, index) => ({
+            userId: uid,
+            role: index === 0 ? 'owner' : 'member'
+          }))
+        }
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                nickname: true,
+                avatar: true,
+                status: true
+              }
+            }
+          }
+        }
+      }
+    })
+
+    const io = req.app.get('io')
+    const onlineUsers = req.app.get('onlineUsers')
+
+    for (const m of conversation.members) {
+      if (m.userId !== userId) {
+        const socketId = onlineUsers.get(m.userId)
+        if (socketId) {
+          io.to(socketId).emit('conversation_added', {
+            conversation: {
+              id: conversation.id,
+              type: conversation.type,
+              name: conversation.name,
+              avatar: conversation.avatar,
+              memberCount: conversation.members.length
+            }
+          })
+        }
+      }
+    }
+
+    const myMember = conversation.members.find(m => m.userId === userId)
+
+    return res.json({
+      success: true,
+      data: {
+        id: conversation.id,
+        type: conversation.type,
+        subtype: conversation.subtype,
+        name: conversation.name,
+        avatar: conversation.avatar,
+        teamId: conversation.teamId,
+        role: myMember?.role || 'member',
+        members: conversation.members.map(m => ({
+          id: m.id,
+          userId: m.userId,
+          role: m.role,
+          user: m.user
+        })),
+        memberCount: conversation.members.length,
+        createdAt: conversation.createdAt
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.post('/department', auth, async (req, res) => {
   try {
     const { departmentId, name } = req.body
