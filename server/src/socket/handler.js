@@ -107,10 +107,17 @@ const setupSocketHandlers = (io) => {
 
           if (mentions && Array.isArray(mentions) && mentions.length > 0) {
             for (const mention of mentions) {
+              const mentionUserId = mention.isAll ? socket.userId : mention.userId
+              if (mention.isAll) {
+                const existingAll = await tx.messageMention.findFirst({
+                  where: { messageId: msg.id, isAll: true }
+                })
+                if (existingAll) continue
+              }
               await tx.messageMention.create({
                 data: {
                   messageId: msg.id,
-                  userId: mention.userId,
+                  userId: mentionUserId,
                   isAll: mention.isAll || false
                 }
               })
@@ -146,6 +153,44 @@ const setupSocketHandlers = (io) => {
           return msg
         })
 
+        const fullMessage = await prisma.message.findUnique({
+          where: { id: message.id },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                nickname: true,
+                avatar: true
+              }
+            },
+            replyTo: replyToId ? {
+              select: {
+                id: true,
+                content: true,
+                type: true,
+                isRecalled: true,
+                sender: {
+                  select: {
+                    id: true,
+                    nickname: true
+                  }
+                }
+              }
+            } : undefined,
+            file: fileId ? true : undefined,
+            mentions: mentions && mentions.length > 0 ? {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true
+                  }
+                }
+              }
+            } : undefined
+          }
+        })
+
         const otherMembers = await prisma.conversationMember.findMany({
           where: {
             conversationId,
@@ -158,13 +203,13 @@ const setupSocketHandlers = (io) => {
           if (receiverSocketId) {
             io.to(receiverSocketId).emit('new_message', {
               conversationId,
-              message,
+              message: fullMessage,
               sender: socket.user
             })
           }
         }
 
-        socket.emit('message_sent', { conversationId, message })
+        socket.emit('message_sent', { conversationId, message: fullMessage })
       } catch (error) {
         console.error('发送消息失败:', error)
       }

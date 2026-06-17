@@ -671,6 +671,57 @@ router.put('/:id', auth, async (req, res) => {
   }
 })
 
+router.get('/:id/members', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const member = await prisma.conversationMember.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: id,
+          userId
+        }
+      }
+    })
+
+    if (!member) {
+      return res.status(403).json({ success: false, message: '无权访问该会话' })
+    }
+
+    const members = await prisma.conversationMember.findMany({
+      where: { conversationId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            nickname: true,
+            avatar: true,
+            phone: true,
+            status: true
+          }
+        }
+      },
+      orderBy: { joinedAt: 'asc' }
+    })
+
+    const data = members.map(m => ({
+      id: m.id,
+      userId: m.userId,
+      role: m.role,
+      unreadCount: m.unreadCount,
+      lastReadAt: m.lastReadAt,
+      joinedAt: m.joinedAt,
+      user: m.user
+    }))
+
+    res.json({ success: true, data })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.post('/:id/members', auth, async (req, res) => {
   try {
     const { id } = req.params
@@ -1152,10 +1203,17 @@ router.post('/:id/messages', auth, async (req, res) => {
 
       if (mentions && Array.isArray(mentions) && mentions.length > 0) {
         for (const mention of mentions) {
+          const mentionUserId = mention.isAll ? userId : mention.userId
+          if (mention.isAll) {
+            const existingAll = await tx.messageMention.findFirst({
+              where: { messageId: msg.id, isAll: true }
+            })
+            if (existingAll) continue
+          }
           await tx.messageMention.create({
             data: {
               messageId: msg.id,
-              userId: mention.userId,
+              userId: mentionUserId,
               isAll: mention.isAll || false
             }
           })
@@ -1191,6 +1249,44 @@ router.post('/:id/messages', auth, async (req, res) => {
       return msg
     })
 
+    const fullMessage = await prisma.message.findUnique({
+      where: { id: message.id },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            nickname: true,
+            avatar: true
+          }
+        },
+        replyTo: replyToId ? {
+          select: {
+            id: true,
+            content: true,
+            type: true,
+            isRecalled: true,
+            sender: {
+              select: {
+                id: true,
+                nickname: true
+              }
+            }
+          }
+        } : undefined,
+        file: fileId ? true : undefined,
+        mentions: mentions && mentions.length > 0 ? {
+          include: {
+            user: {
+              select: {
+                id: true,
+                nickname: true
+              }
+            }
+          }
+        } : undefined
+      }
+    })
+
     const io = req.app.get('io')
     const onlineUsers = req.app.get('onlineUsers')
 
@@ -1217,7 +1313,7 @@ router.post('/:id/messages', auth, async (req, res) => {
       if (socketId) {
         io.to(socketId).emit('new_message', {
           conversationId: id,
-          message,
+          message: fullMessage,
           otherUser: {
             id: (await prisma.user.findUnique({
               where: { id: userId },
@@ -1228,7 +1324,7 @@ router.post('/:id/messages', auth, async (req, res) => {
       }
     }
 
-    res.json({ success: true, data: message })
+    res.json({ success: true, data: fullMessage })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

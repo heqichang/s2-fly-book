@@ -35,7 +35,7 @@ interface SocketState {
   onlineUsers: Map<string, boolean>
   initSocket: (token: string, _userId: string) => void
   disconnectSocket: () => void
-  addSocketListener: (event: SocketEventHandler['event'], handler: SocketEventHandler['handler']) => void
+  addSocketListener: (event: SocketEventHandler['event'], handler: SocketEventHandler['handler']) => () => void
   isUserOnline: (userId: string) => boolean
 }
 
@@ -95,7 +95,11 @@ export const useSocketStore = create<SocketState>()((set, get) => ({
     const { socket } = get()
     if (socket) {
       socket.on(event, handler)
+      return () => {
+        socket.off(event, handler)
+      }
     }
+    return () => {}
   },
 
   isUserOnline: (userId: string) => {

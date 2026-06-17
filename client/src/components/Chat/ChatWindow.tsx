@@ -162,7 +162,11 @@ function ChatWindow() {
 
     const handleMessagePinned = (data: { conversationId: string; pinnedMessage: PinnedMessage }) => {
       if (data.conversationId === id) {
-        setPinnedMessages((prev) => [...prev, data.pinnedMessage])
+        setPinnedMessages((prev) => {
+          const exists = prev.some((p) => p.messageId === data.pinnedMessage.messageId)
+          if (exists) return prev
+          return [...prev, data.pinnedMessage]
+        })
       }
     }
 
@@ -185,13 +189,19 @@ function ChatWindow() {
       }
     }
 
-    addSocketListener('new_message', handleNewMessage as never)
-    addSocketListener('message_recalled', handleMessageRecalled as never)
-    addSocketListener('message_deleted', handleMessageDeleted as never)
-    addSocketListener('message_pinned', handleMessagePinned as never)
-    addSocketListener('message_unpinned', handleMessageUnpinned as never)
-    addSocketListener('message_read', handleMessageRead as never)
-    addSocketListener('conversation_updated', handleConversationUpdated as never)
+    const unsubscribers = [
+      addSocketListener('new_message', handleNewMessage as never),
+      addSocketListener('message_recalled', handleMessageRecalled as never),
+      addSocketListener('message_deleted', handleMessageDeleted as never),
+      addSocketListener('message_pinned', handleMessagePinned as never),
+      addSocketListener('message_unpinned', handleMessageUnpinned as never),
+      addSocketListener('message_read', handleMessageRead as never),
+      addSocketListener('conversation_updated', handleConversationUpdated as never)
+    ]
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub())
+    }
   }, [id, socket, addSocketListener])
 
   useEffect(() => {
@@ -362,7 +372,7 @@ function ChatWindow() {
     const mentions: { userId: string; isAll?: boolean }[] = []
     const allMatch = text.match(/@所有人/g)
     if (allMatch) {
-      mentions.push({ userId: 'all', isAll: true })
+      mentions.push({ userId: currentUser?.id || '', isAll: true })
     }
 
     const userMentions = text.match(/@(\S+)/g) || []
@@ -428,7 +438,7 @@ function ChatWindow() {
             user: {
               id: m.userId,
               email: user?.email || '',
-              nickname: m.userId === 'all' ? '所有人' : (user?.nickname || ''),
+              nickname: m.isAll ? '所有人' : (user?.nickname || ''),
               avatar: user?.avatar || null,
               createdAt: user?.createdAt || new Date().toISOString(),
               updatedAt: user?.updatedAt || new Date().toISOString()
