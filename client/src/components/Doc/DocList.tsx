@@ -6,7 +6,8 @@ import {
   renameDocument,
   toggleFavorite,
   getRecentDocuments,
-  getFavoriteDocuments
+  getFavoriteDocuments,
+  moveDocument
 } from '../../api/documents'
 import type { Document, DocFolder, DocRecent, DocFavorite } from '../../types'
 import useToast from '../../hooks/useToast'
@@ -61,6 +62,13 @@ function DocList({
     name: string
   }>({ visible: false, type: 'document', id: '', name: '' })
   const [renameInput, setRenameInput] = useState('')
+  const [moveModal, setMoveModal] = useState<{
+    visible: boolean
+    type: 'document' | 'folder'
+    id: string
+    name: string
+  }>({ visible: false, type: 'document', id: '', name: '' })
+  const [selectedMoveFolder, setSelectedMoveFolder] = useState<string | null>(null)
   const [breadcrumbs, setBreadcrumbs] = useState<DocFolder[]>([])
   const menuRef = useRef<HTMLDivElement>(null)
   const { toast, showToast, hideToast } = useToast()
@@ -194,6 +202,38 @@ function DocList({
     } catch (err: unknown) {
       const error = err as { message?: string }
       showToast(error.message || '重命名失败', 'error')
+    }
+  }
+
+  const handleMove = () => {
+    const item = getCurrentItem(actionMenu.type, actionMenu.id)
+    if (item) {
+      const name = actionMenu.type === 'document'
+        ? (item as Document).title
+        : (item as DocFolder).name
+      setMoveModal({
+        visible: true,
+        type: actionMenu.type,
+        id: actionMenu.id,
+        name
+      })
+      setSelectedMoveFolder(folderId || null)
+    }
+    setActionMenu((prev) => ({ ...prev, visible: false }))
+  }
+
+  const handleMoveSubmit = async () => {
+    try {
+      if (moveModal.type === 'document') {
+        await moveDocument(moveModal.id, selectedMoveFolder || 'root')
+        setDocuments((prev) => prev.filter((d) => d.id !== moveModal.id))
+        showToast('移动成功', 'success')
+      }
+      setMoveModal((prev) => ({ ...prev, visible: false }))
+      loadData()
+    } catch (err: unknown) {
+      const error = err as { message?: string }
+      showToast(error.message || '移动失败', 'error')
     }
   }
 
@@ -473,7 +513,7 @@ function DocList({
             </button>
           )}
           <button
-            onClick={() => setActionMenu((prev) => ({ ...prev, visible: false }))}
+            onClick={handleMove}
             className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -523,6 +563,63 @@ function DocList({
                 className="px-5 py-2.5 bg-[#3370FF] hover:bg-[#2a5fd9] text-white rounded-xl text-sm font-medium transition-all"
               >
                 确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {moveModal.visible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setMoveModal((prev) => ({ ...prev, visible: false }))}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">移动到</h3>
+            <p className="text-sm text-gray-500 mb-4">将「{moveModal.name}」移动到：</p>
+            <div className="mb-6 max-h-64 overflow-y-auto border border-gray-100 rounded-xl">
+              <button
+                onClick={() => setSelectedMoveFolder(null)}
+                className={`w-full px-4 py-3 text-left text-sm flex items-center space-x-2 transition-colors ${
+                  selectedMoveFolder === null ? 'bg-[#3370FF]/10 text-[#3370FF]' : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                <span>全部文件（根目录）</span>
+              </button>
+              {folders.map((folder) => (
+                <button
+                  key={folder.id}
+                  onClick={() => setSelectedMoveFolder(folder.id)}
+                  className={`w-full px-4 py-3 text-left text-sm flex items-center space-x-2 transition-colors border-t border-gray-50 ${
+                    selectedMoveFolder === folder.id ? 'bg-[#3370FF]/10 text-[#3370FF]' : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  <span>{folder.name}</span>
+                </button>
+              ))}
+              {folders.length === 0 && (
+                <div className="px-4 py-6 text-center text-sm text-gray-400">
+                  暂无文件夹
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setMoveModal((prev) => ({ ...prev, visible: false }))}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-all"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleMoveSubmit}
+                className="px-5 py-2.5 bg-[#3370FF] hover:bg-[#2a5fd9] text-white rounded-xl text-sm font-medium transition-all"
+              >
+                确定移动
               </button>
             </div>
           </div>

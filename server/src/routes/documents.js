@@ -21,9 +21,7 @@ const getDocRole = async (userId, documentId) => {
   const doc = await prisma.document.findUnique({
     where: { id: documentId },
     include: {
-      permissions: {
-        where: { userId }
-      },
+      permissions: true,
       shares: true
     }
   })
@@ -32,13 +30,17 @@ const getDocRole = async (userId, documentId) => {
 
   if (doc.createdById === userId) return 'admin'
 
-  const permission = doc.permissions[0]
+  const permission = doc.permissions.find(p => p.userId === userId)
   if (permission) return permission.role
 
   const share = doc.shares[0]
   if (share && share.shareType === 'team' && share.teamRole) {
     const isTeamMember = await checkTeamMember(userId, doc.teamId)
     if (isTeamMember) return share.teamRole
+  }
+
+  if (share && share.linkEnabled && share.linkRole) {
+    return share.linkRole
   }
 
   return null
@@ -221,15 +223,14 @@ router.get('/team/:teamId', auth, async (req, res) => {
           select: { id: true, nickname: true, avatar: true }
         },
         favorites: {
-          where: { userId },
-          select: { id: true }
+          select: { id: true, userId: true }
         }
       }
     })
 
     const docsWithFavorites = documents.map(doc => ({
       ...doc,
-      isFavorite: doc.favorites.length > 0,
+      isFavorite: doc.favorites.some(f => f.userId === userId),
       favorites: undefined
     }))
 
@@ -257,8 +258,7 @@ router.get('/:id', auth, async (req, res) => {
           select: { id: true, name: true, parentId: true }
         },
         favorites: {
-          where: { userId },
-          select: { id: true }
+          select: { id: true, userId: true }
         }
       }
     })
@@ -290,7 +290,7 @@ router.get('/:id', auth, async (req, res) => {
       success: true,
       data: {
         ...doc,
-        isFavorite: doc.favorites.length > 0,
+        isFavorite: doc.favorites.some(f => f.userId === userId),
         role,
         favorites: undefined
       }
@@ -473,7 +473,6 @@ router.get('/recent/list', auth, async (req, res) => {
       take: parseInt(limit),
       include: {
         document: {
-          where: { isDeleted: false },
           include: {
             createdBy: {
               select: { id: true, nickname: true, avatar: true }
@@ -484,7 +483,7 @@ router.get('/recent/list', auth, async (req, res) => {
     })
 
     const validRecents = recents
-      .filter(r => r.document)
+      .filter(r => r.document && !r.document.isDeleted)
       .map(r => ({
         id: r.id,
         openedAt: r.openedAt,
@@ -508,7 +507,6 @@ router.get('/favorites/list', auth, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         document: {
-          where: { isDeleted: false },
           include: {
             createdBy: {
               select: { id: true, nickname: true, avatar: true }
@@ -519,7 +517,7 @@ router.get('/favorites/list', auth, async (req, res) => {
     })
 
     const validFavorites = favorites
-      .filter(f => f.document)
+      .filter(f => f.document && !f.document.isDeleted)
       .map(f => ({
         id: f.id,
         createdAt: f.createdAt,

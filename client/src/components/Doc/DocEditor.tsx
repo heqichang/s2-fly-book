@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import DocBlockComponent from './DocBlock'
 import DocToolbar from './DocToolbar'
+import DocShareModal from './DocShareModal'
+import DocCommentPanel from './DocCommentPanel'
 import { getDocument, updateDocument, toggleFavorite } from '../../api/documents'
 import type { DocBlock, DocBlockType, Document } from '../../types'
 import useToast from '../../hooks/useToast'
@@ -408,81 +410,52 @@ function DocEditor({ documentId, onBack }: DocEditorProps) {
           canRedo={historyIndex < history.length - 1}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-8 py-8">
-            <input
-              type="text"
-              value={title}
-              onChange={handleTitleChange}
-              placeholder="无标题文档"
-              className="w-full text-3xl font-bold text-gray-900 outline-none mb-6 placeholder-gray-300 bg-transparent"
-            />
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto px-8 py-8">
+              <input
+                type="text"
+                value={title}
+                onChange={handleTitleChange}
+                placeholder="无标题文档"
+                className="w-full text-3xl font-bold text-gray-900 outline-none mb-6 placeholder-gray-300 bg-transparent"
+              />
 
-            <div className="space-y-1">
-              {blocks.map((block, index) => (
-                <DocBlockComponent
-                  key={block.id}
-                  block={block}
-                  index={index}
-                  totalBlocks={blocks.length}
-                  onChange={(b) => handleBlockChange(index, b)}
-                  onAddBlock={handleAddBlock}
-                  onDeleteBlock={handleDeleteBlock}
-                  onFocus={handleBlockFocus}
-                  onTypeChange={handleTypeChange}
-                  isFocused={focusedBlockIndex === index}
-                />
-              ))}
+              <div className="space-y-1">
+                {blocks.map((block, index) => (
+                  <DocBlockComponent
+                    key={block.id}
+                    block={block}
+                    index={index}
+                    totalBlocks={blocks.length}
+                    onChange={(b) => handleBlockChange(index, b)}
+                    onAddBlock={handleAddBlock}
+                    onDeleteBlock={handleDeleteBlock}
+                    onFocus={handleBlockFocus}
+                    onTypeChange={handleTypeChange}
+                    isFocused={focusedBlockIndex === index}
+                  />
+                ))}
+              </div>
             </div>
           </div>
+
+          {showComments && (
+            <div className="w-[380px] border-l border-gray-100 flex-shrink-0 bg-gray-50 flex flex-col">
+              <DocCommentPanel
+                documentId={documentId}
+                mode="document"
+                onClose={() => setShowComments(false)}
+              />
+            </div>
+          )}
         </div>
 
-        {showShareModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900">分享文档</h3>
-                <button
-                  onClick={() => setShowShareModal(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">分享链接</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={window.location.href}
-                        readOnly
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600"
-                      />
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(window.location.href)
-                          showToast('链接已复制', 'success')
-                        }}
-                        className="px-4 py-2 bg-[#3370FF] text-white rounded-lg text-sm font-medium hover:bg-[#2a5fd9] transition-colors"
-                      >
-                        复制
-                      </button>
-                    </div>
-                  </div>
-                  <div className="pt-2">
-                    <p className="text-xs text-gray-500">
-                      提示：拥有链接的人可以查看此文档。如需更精细的权限控制，请在文档设置中配置。
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <DocShareModal
+          documentId={documentId}
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+        />
       </div>
     </>
   )
