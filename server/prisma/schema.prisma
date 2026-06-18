@@ -31,6 +31,15 @@ model User {
   createdFiles           File[]
   pinnedMessages         PinnedMessage[]
   messageMentions        MessageMention[]
+  createdFolders         DocFolder[]
+  createdDocuments       Document[]           @relation("DocCreator")
+  updatedDocuments       Document[]           @relation("DocUpdater")
+  docPermissions         DocPermission[]
+  docComments            DocComment[]
+  docMentions            DocMention[]
+  docRecents             DocRecent[]
+  docFavorites           DocFavorite[]
+  resolvedComments       DocComment[]         @relation("CommentResolver")
 }
 
 model FriendRequest {
@@ -73,6 +82,8 @@ model Team {
   members     TeamMember[]
   departments Department[]
   conversations Conversation[]
+  docFolders  DocFolder[]
+  documents   Document[]
 }
 
 model TeamMember {
@@ -231,4 +242,144 @@ model File {
 
   message     Message? @relation(fields: [messageId], references: [id])
   uploadedBy  User     @relation(fields: [uploadedById], references: [id])
+}
+
+model DocFolder {
+  id        String     @id @default(uuid())
+  teamId    String
+  name      String
+  parentId  String?
+  createdById String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  team      Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  parent    DocFolder? @relation("FolderParent", fields: [parentId], references: [id])
+  children  DocFolder[] @relation("FolderParent")
+  documents Document[]
+  createdBy User       @relation(fields: [createdById], references: [id])
+
+  @@index([teamId])
+  @@index([parentId])
+}
+
+model Document {
+  id          String     @id @default(uuid())
+  teamId      String
+  folderId    String?
+  title       String     @default("未命名文档")
+  content     String     @default("[]")
+  createdById String
+  updatedById String
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  team        Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  folder      DocFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy   User       @relation("DocCreator", fields: [createdById], references: [id])
+  updatedBy   User       @relation("DocUpdater", fields: [updatedById], references: [id])
+  permissions DocPermission[]
+  comments    DocComment[]
+  recents     DocRecent[]
+  favorites   DocFavorite[]
+  shares      DocShare[]
+
+  @@index([teamId])
+  @@index([folderId])
+  @@index([createdById])
+}
+
+model DocPermission {
+  id         String   @id @default(uuid())
+  documentId String
+  userId     String
+  role       String   @default("viewer")
+  createdAt  DateTime @default(now())
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@index([userId])
+}
+
+model DocComment {
+  id          String      @id @default(uuid())
+  documentId  String
+  userId      String
+  content     String
+  blockId     String?
+  blockText   String?
+  parentId    String?
+  isResolved  Boolean     @default(false)
+  resolvedById String?
+  resolvedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  document    Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent      DocComment? @relation("CommentReply", fields: [parentId], references: [id])
+  replies     DocComment[] @relation("CommentReply")
+  mentions    DocMention[]
+  resolvedBy  User?       @relation("CommentResolver", fields: [resolvedById], references: [id])
+
+  @@index([documentId])
+  @@index([parentId])
+  @@index([userId])
+}
+
+model DocMention {
+  id        String     @id @default(uuid())
+  commentId String
+  userId    String
+  createdAt DateTime   @default(now())
+
+  comment   DocComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DocRecent {
+  id         String   @id @default(uuid())
+  userId     String
+  documentId String
+  openedAt   DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId])
+}
+
+model DocFavorite {
+  id         String   @id @default(uuid())
+  userId     String
+  documentId String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId])
+}
+
+model DocShare {
+  id          String   @id @default(uuid())
+  documentId  String
+  shareType   String   @default("private")
+  teamRole    String?
+  linkEnabled Boolean  @default(false)
+  linkRole    String?
+  linkToken   String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId])
 }

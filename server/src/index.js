@@ -11,6 +11,9 @@ import conversationsRouter from './routes/conversations.js'
 import teamsRouter from './routes/teams.js'
 import departmentsRouter from './routes/departments.js'
 import filesRouter from './routes/files.js'
+import documentsRouter from './routes/documents.js'
+import docCommentsRouter from './routes/doc-comments.js'
+import docShareRouter from './routes/doc-share.js'
 
 import { setupSocketHandlers } from './socket/handler.js'
 
@@ -50,6 +53,9 @@ app.use('/api/conversations', conversationsRouter)
 app.use('/api/teams', teamsRouter)
 app.use('/api/departments', departmentsRouter)
 app.use('/api/files', filesRouter)
+app.use('/api/documents', documentsRouter)
+app.use('/api/doc-comments', docCommentsRouter)
+app.use('/api/doc-share', docShareRouter)
 
 app.use((err, req, res, next) => {
   console.error(err.stack)

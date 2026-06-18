@@ -8,6 +8,7 @@ import ContactsPage from './pages/ContactsPage'
 import ProfilePage from './pages/ProfilePage'
 import TeamsPage from './pages/TeamsPage'
 import OrganizationPage from './pages/OrganizationPage'
+import DocsPage from './pages/DocsPage'
 
 function App() {
   return (
@@ -31,6 +32,8 @@ function App() {
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="organization/:departmentId" element={<OrganizationPage />} />
         <Route path="contacts" element={<ContactsPage />} />
+        <Route path="docs" element={<DocsPage />} />
+        <Route path="docs/:id" element={<DocsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

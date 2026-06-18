@@ -296,3 +296,170 @@ export interface UploadFileResponse {
   expiresAt?: string
   createdAt: string
 }
+
+// ============= 文档相关类型 =============
+
+export type DocBlockType =
+  | 'heading'
+  | 'paragraph'
+  | 'orderedList'
+  | 'unorderedList'
+  | 'taskList'
+  | 'quote'
+  | 'code'
+  | 'table'
+  | 'image'
+  | 'divider'
+
+export interface DocBlock {
+  id: string
+  type: DocBlockType
+  content: string
+  level?: number
+  checked?: boolean
+  language?: string
+  cells?: string[][]
+  imageUrl?: string
+}
+
+export interface DocFolder {
+  id: string
+  teamId: string
+  name: string
+  parentId?: string | null
+  createdById: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: User
+  _count?: {
+    children: number
+    documents: number
+  }
+}
+
+export interface Document {
+  id: string
+  teamId: string
+  folderId?: string | null
+  title: string
+  content: string
+  createdById: string
+  updatedById: string
+  isDeleted: boolean
+  isFavorite: boolean
+  role?: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: User
+  updatedBy?: User
+  folder?: {
+    id: string
+    name: string
+    parentId?: string | null
+  }
+}
+
+export interface DocPermission {
+  id: string
+  documentId: string
+  userId: string
+  role: string
+  createdAt: string
+  user: User
+}
+
+export interface DocComment {
+  id: string
+  documentId: string
+  userId: string
+  content: string
+  blockId?: string | null
+  blockText?: string | null
+  parentId?: string | null
+  isResolved: boolean
+  resolvedById?: string | null
+  resolvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  user: User
+  replies?: DocComment[]
+  mentions?: DocMention[]
+  resolvedBy?: User
+}
+
+export interface DocMention {
+  id: string
+  commentId: string
+  userId: string
+  createdAt: string
+  user: User
+}
+
+export interface DocRecent {
+  id: string
+  userId: string
+  documentId: string
+  openedAt: string
+  document: Document
+}
+
+export interface DocFavorite {
+  id: string
+  userId: string
+  documentId: string
+  createdAt: string
+  document: Document
+}
+
+export interface DocShare {
+  id: string
+  documentId: string
+  shareType: 'private' | 'team' | 'link'
+  teamRole?: string | null
+  linkEnabled: boolean
+  linkRole?: string | null
+  linkToken?: string | null
+  canManage?: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type DocRole = 'viewer' | 'commenter' | 'editor' | 'admin'
+
+export interface CreateDocumentRequest {
+  teamId: string
+  folderId?: string
+  title?: string
+  template?: string
+}
+
+export interface UpdateDocumentRequest {
+  title?: string
+  content?: string
+  folderId?: string
+}
+
+export interface CreateFolderRequest {
+  teamId: string
+  name: string
+  parentId?: string
+}
+
+export interface UpdateFolderRequest {
+  name?: string
+  parentId?: string
+}
+
+export interface CreateDocCommentRequest {
+  content: string
+  blockId?: string
+  blockText?: string
+  parentId?: string
+}
+
+export interface UpdateDocShareRequest {
+  shareType?: string
+  teamRole?: string
+  linkEnabled?: boolean
+  linkRole?: string
+}
