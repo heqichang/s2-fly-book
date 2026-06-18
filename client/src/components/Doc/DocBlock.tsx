@@ -166,6 +166,34 @@ function DocBlock({
   }, [isFocused])
 
   useEffect(() => {
+    if (contentRef.current && block.type !== 'code' && block.type !== 'table' && block.type !== 'image' && block.type !== 'divider') {
+      const domContent = contentRef.current.innerText || ''
+      if (domContent !== block.content) {
+        const sel = window.getSelection()
+        let offset = 0
+        let node: Node | null = null
+        if (sel && sel.rangeCount > 0 && contentRef.current.contains(sel.anchorNode)) {
+          const range = sel.getRangeAt(0)
+          offset = range.endOffset
+          node = range.endContainer
+        }
+        contentRef.current.innerText = block.content
+        if (node && contentRef.current.contains(node)) {
+          try {
+            const range = document.createRange()
+            range.setStart(node, Math.min(offset, (node.textContent || '').length))
+            range.collapse(true)
+            sel?.removeAllRanges()
+            sel?.addRange(range)
+          } catch {
+            contentRef.current.focus()
+          }
+        }
+      }
+    }
+  }, [block.content, block.type])
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false)
@@ -197,9 +225,7 @@ function DocBlock({
             onKeyDown={handleKeyDown}
             onFocus={() => onFocus(index)}
             data-placeholder={`Heading ${level}`}
-          >
-            {block.content}
-          </div>
+          />
         )
 
       case 'paragraph':
@@ -213,9 +239,7 @@ function DocBlock({
             onKeyDown={handleKeyDown}
             onFocus={() => onFocus(index)}
             data-placeholder="输入 '/' 打开命令菜单..."
-          >
-            {block.content}
-          </div>
+          />
         )
 
       case 'orderedList':
@@ -231,9 +255,7 @@ function DocBlock({
               onKeyDown={handleKeyDown}
               onFocus={() => onFocus(index)}
               data-placeholder="列表项"
-            >
-              {block.content}
-            </div>
+            />
           </div>
         )
 
@@ -252,9 +274,7 @@ function DocBlock({
               onKeyDown={handleKeyDown}
               onFocus={() => onFocus(index)}
               data-placeholder="列表项"
-            >
-              {block.content}
-            </div>
+            />
           </div>
         )
 
@@ -276,9 +296,7 @@ function DocBlock({
               onKeyDown={handleKeyDown}
               onFocus={() => onFocus(index)}
               data-placeholder="待办事项"
-            >
-              {block.content}
-            </div>
+            />
           </div>
         )
 
@@ -294,9 +312,7 @@ function DocBlock({
               onKeyDown={handleKeyDown}
               onFocus={() => onFocus(index)}
               data-placeholder="引用内容..."
-            >
-              {block.content}
-            </div>
+            />
           </div>
         )
 
