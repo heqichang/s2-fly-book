@@ -463,3 +463,367 @@ export interface UpdateDocShareRequest {
   linkEnabled?: boolean
   linkRole?: string
 }
+
+// ============= 表单相关类型 =============
+
+export type FormFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'date'
+  | 'time'
+  | 'select'
+  | 'multiSelect'
+  | 'member'
+  | 'department'
+  | 'attachment'
+  | 'money'
+  | 'detailTable'
+
+export interface FormFieldOption {
+  label: string
+  value: string
+}
+
+export interface FormFieldValidation {
+  minLength?: number
+  maxLength?: number
+  min?: number
+  max?: number
+  pattern?: string
+  customMessage?: string
+}
+
+export interface DetailTableColumn {
+  key: string
+  label: string
+  type: FormFieldType
+  isRequired?: boolean
+  options?: FormFieldOption[]
+}
+
+export interface FormFieldConfig {
+  detailTableColumns?: DetailTableColumn[]
+  precision?: number
+  allowMultiple?: boolean
+  maxCount?: number
+  acceptTypes?: string[]
+}
+
+export interface FormField {
+  id: string
+  formTemplateId: string
+  fieldKey: string
+  label: string
+  type: FormFieldType
+  placeholder?: string | null
+  helpText?: string | null
+  defaultValue?: unknown
+  isRequired: boolean
+  isHidden: boolean
+  isDisabled: boolean
+  sortOrder: number
+  options?: FormFieldOption[] | null
+  validation?: FormFieldValidation | null
+  config?: FormFieldConfig | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FormTemplate {
+  id: string
+  teamId: string
+  name: string
+  icon?: string | null
+  description?: string | null
+  category?: string | null
+  isEnabled: boolean
+  isDefault: boolean
+  sortOrder: number
+  fields?: FormField[]
+  createdById: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type FormRecordStatus = 'draft' | 'submitted' | 'processing' | 'approved' | 'rejected' | 'withdrawn'
+
+export interface FormRecord {
+  id: string
+  formTemplateId: string
+  approvalInstanceId?: string | null
+  submitterId: string
+  formData: Record<string, unknown>
+  status: FormRecordStatus
+  submittedAt?: string | null
+  submitter?: User
+  formTemplate?: FormTemplate
+  approvalInstance?: ApprovalInstance
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateFormTemplateRequest {
+  teamId: string
+  name: string
+  icon?: string
+  description?: string
+  category?: string
+  isDefault?: boolean
+  sortOrder?: number
+  fields?: Array<Omit<FormField, 'id' | 'formTemplateId' | 'createdAt' | 'updatedAt'>>
+}
+
+export interface UpdateFormTemplateRequest {
+  name?: string
+  icon?: string
+  description?: string
+  category?: string
+  isEnabled?: boolean
+  isDefault?: boolean
+  sortOrder?: number
+  fields?: Array<Omit<FormField, 'id' | 'formTemplateId' | 'createdAt' | 'updatedAt'> & { id?: string }>
+}
+
+// ============= 审批相关类型 =============
+
+export type ApprovalNodeType =
+  | 'initiator'
+  | 'approver'
+  | 'cc'
+  | 'condition'
+  | 'countersign'
+  | 'orSign'
+  | 'autoApprove'
+  | 'autoReject'
+
+export type AssigneeType = 'user' | 'department' | 'role' | 'formField' | 'initiator' | 'initiatorLeader'
+
+export type SignType = 'all' | 'any' | 'order'
+
+export type AutoAction = 'approve' | 'reject'
+
+export interface ApprovalNodeConfig {
+  allowTransfer?: boolean
+  allowAddSign?: boolean
+  allowUrge?: boolean
+  autoApproveWhenEmpty?: boolean
+}
+
+export interface ApprovalNode {
+  id: string
+  approvalTemplateId: string
+  parentNodeId?: string | null
+  nodeType: ApprovalNodeType
+  nodeName: string
+  sortOrder: number
+  assigneeType?: AssigneeType | null
+  assigneeIds?: string[] | null
+  assigneeFieldKey?: string | null
+  signType?: SignType | null
+  conditionExpression?: string | null
+  autoAction?: AutoAction | null
+  ccUserIds?: string[] | null
+  config?: ApprovalNodeConfig | null
+  childNodes?: ApprovalNode[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ApprovalTemplate {
+  id: string
+  formTemplateId: string
+  teamId: string
+  name: string
+  description?: string | null
+  isEnabled: boolean
+  timeoutHours?: number | null
+  nodes?: ApprovalNode[]
+  createdById: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'processing'
+
+export interface ApprovalInstance {
+  id: string
+  approvalTemplateId: string
+  formTemplateId: string
+  formData: Record<string, unknown>
+  initiatorId: string
+  teamId: string
+  title: string
+  status: ApprovalStatus
+  currentNodeId?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  tasks?: ApprovalTask[]
+  actions?: ApprovalAction[]
+  comments?: ApprovalComment[]
+  ccs?: ApprovalCc[]
+  initiator?: User
+  formTemplate?: FormTemplate
+  currentNode?: ApprovalNode
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApprovalTaskStatus = 'pending' | 'approved' | 'rejected' | 'transferred' | 'delegated'
+
+export interface ApprovalTask {
+  id: string
+  approvalInstanceId: string
+  approvalNodeId: string
+  assigneeId: string
+  status: ApprovalTaskStatus
+  action?: ApprovalActionType | null
+  comment?: string | null
+  assignedAt: string
+  actedAt?: string | null
+  assignee?: User
+  approvalInstance?: ApprovalInstance
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApprovalActionType =
+  | 'approve'
+  | 'reject'
+  | 'transfer'
+  | 'addSign'
+  | 'withdraw'
+  | 'urge'
+  | 'comment'
+  | 'submit'
+
+export type ApprovalActionStatus = 'success' | 'failed' | 'pending'
+
+export interface ApprovalAction {
+  id: string
+  approvalInstanceId: string
+  actorId: string
+  actionType: ApprovalActionType
+  actionStatus: ApprovalActionStatus
+  comment?: string | null
+  fromNodeId?: string | null
+  toNodeId?: string | null
+  targetUserId?: string | null
+  extraData?: Record<string, unknown> | null
+  actor?: User
+  createdAt: string
+}
+
+export interface ApprovalComment {
+  id: string
+  approvalInstanceId: string
+  commenterId: string
+  content: string
+  parentId?: string | null
+  commenter?: User
+  replies?: ApprovalComment[]
+  createdAt: string
+}
+
+export interface ApprovalCc {
+  id: string
+  approvalInstanceId: string
+  ccUserId: string
+  readAt?: string | null
+  ccUser?: User
+  createdAt: string
+}
+
+export type ApprovalNotificationType =
+  | 'pending_approval'
+  | 'approval_result'
+  | 'cc'
+  | 'urge'
+  | 'timeout'
+
+export interface ApprovalNotification {
+  id: string
+  userId: string
+  approvalInstanceId: string
+  approvalTaskId?: string | null
+  notificationType: ApprovalNotificationType
+  title: string
+  content: string
+  isRead: boolean
+  readAt?: string | null
+  approvalInstance?: ApprovalInstance
+  approvalTask?: ApprovalTask
+  createdAt: string
+}
+
+export interface CreateApprovalTemplateRequest {
+  formTemplateId: string
+  teamId: string
+  name: string
+  description?: string
+  timeoutHours?: number
+  nodes?: Array<Omit<ApprovalNode, 'id' | 'approvalTemplateId' | 'createdAt' | 'updatedAt' | 'childNodes'> & { childNodes?: any[] }>
+}
+
+export interface UpdateApprovalTemplateRequest {
+  name?: string
+  description?: string
+  isEnabled?: boolean
+  timeoutHours?: number
+  nodes?: Array<Omit<ApprovalNode, 'approvalTemplateId' | 'createdAt' | 'updatedAt' | 'childNodes'> & { id?: string; childNodes?: any[] }>
+}
+
+export interface CreateApprovalInstanceRequest {
+  approvalTemplateId: string
+  formTemplateId: string
+  formData: Record<string, unknown>
+  title: string
+  teamId: string
+}
+
+export interface ApproveRequest {
+  comment?: string
+}
+
+export interface RejectRequest {
+  comment: string
+}
+
+export interface TransferRequest {
+  targetUserId: string
+  comment?: string
+}
+
+export interface AddSignRequest {
+  targetUserId: string
+  nodeName?: string
+  signType?: SignType
+  comment?: string
+}
+
+export interface CreateApprovalCommentRequest {
+  content: string
+  parentId?: string
+}
+
+export interface ApprovalInstanceListResponse {
+  items: ApprovalInstance[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface ApprovalTaskListResponse {
+  items: ApprovalTask[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface ApprovalNotificationListResponse {
+  items: ApprovalNotification[]
+  total: number
+  page: number
+  pageSize: number
+  unreadCount: number
+}

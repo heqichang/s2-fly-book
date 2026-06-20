@@ -14,6 +14,10 @@ import filesRouter from './routes/files.js'
 import documentsRouter from './routes/documents.js'
 import docCommentsRouter from './routes/doc-comments.js'
 import docShareRouter from './routes/doc-share.js'
+import formTemplatesRouter from './routes/form-templates.js'
+import approvalInstancesRouter from './routes/approval-instances.js'
+import approvalTemplatesRouter from './routes/approval-templates.js'
+import approvalNotificationsRouter from './routes/approval-notifications.js'
 
 import { setupSocketHandlers } from './socket/handler.js'
 
@@ -56,6 +60,10 @@ app.use('/api/files', filesRouter)
 app.use('/api/documents', documentsRouter)
 app.use('/api/doc-comments', docCommentsRouter)
 app.use('/api/doc-share', docShareRouter)
+app.use('/api/form-templates', formTemplatesRouter)
+app.use('/api/approval-instances', approvalInstancesRouter)
+app.use('/api/approval-notifications', approvalNotificationsRouter)
+app.use('/api/approval-templates', approvalTemplatesRouter)
 
 app.use((err, req, res, next) => {
   console.error(err.stack)

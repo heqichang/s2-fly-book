@@ -9,6 +9,7 @@ import ProfilePage from './pages/ProfilePage'
 import TeamsPage from './pages/TeamsPage'
 import OrganizationPage from './pages/OrganizationPage'
 import DocsPage from './pages/DocsPage'
+import ApprovalPage from './pages/ApprovalPage'
 
 function App() {
   return (
@@ -34,6 +35,8 @@ function App() {
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="docs" element={<DocsPage />} />
         <Route path="docs/:id" element={<DocsPage />} />
+        <Route path="approvals" element={<ApprovalPage />} />
+        <Route path="approvals/:id" element={<ApprovalPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
