@@ -81,6 +81,41 @@ const validateField = (field) => {
   return null
 }
 
+router.get('/', auth, async (req, res) => {
+  try {
+    const { teamId } = req.query
+    const userId = req.user.userId
+
+    if (!teamId) {
+      return res.status(400).json({ success: false, message: '请提供团队ID' })
+    }
+
+    if (!await checkTeamMember(userId, teamId)) {
+      return res.status(403).json({ success: false, message: '您不是该团队成员' })
+    }
+
+    const templates = await prisma.formTemplate.findMany({
+      where: { teamId },
+      include: {
+        createdBy: {
+          select: { id: true, nickname: true, avatar: true }
+        },
+        updatedBy: {
+          select: { id: true, nickname: true, avatar: true }
+        },
+        fields: true
+      },
+      orderBy: { sortOrder: 'asc' }
+    })
+
+    const data = templates.map(t => parseFormTemplate(t))
+
+    res.json({ success: true, data })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.get('/team/:teamId', auth, async (req, res) => {
   try {
     const { teamId } = req.params

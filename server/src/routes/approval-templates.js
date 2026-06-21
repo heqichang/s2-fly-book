@@ -52,6 +52,92 @@ const prepareNodeData = (data) => {
   return result
 }
 
+router.get('/', auth, async (req, res) => {
+  try {
+    const { teamId, formTemplateId } = req.query
+    const userId = req.user.userId
+
+    if (!teamId && !formTemplateId) {
+      return res.status(400).json({ success: false, message: '请提供团队ID或表单模板ID' })
+    }
+
+    let where = {}
+    if (teamId) {
+      where.teamId = teamId
+    }
+    if (formTemplateId) {
+      where.formTemplateId = formTemplateId
+    }
+
+    if (teamId) {
+      const teamMember = await prisma.teamMember.findUnique({
+        where: { teamId_userId: { teamId, userId } }
+      })
+      if (!teamMember) {
+        return res.status(403).json({ success: false, message: '您不是该团队成员' })
+      }
+    } else if (formTemplateId) {
+      const formTemplate = await prisma.formTemplate.findUnique({
+        where: { id: formTemplateId },
+        include: { team: true }
+      })
+      if (!formTemplate) {
+        return res.status(404).json({ success: false, message: '表单模板不存在' })
+      }
+      const teamMember = await prisma.teamMember.findUnique({
+        where: { teamId_userId: { teamId: formTemplate.teamId, userId } }
+      })
+      if (!teamMember) {
+        return res.status(403).json({ success: false, message: '您不是该团队成员' })
+      }
+    }
+
+    const templates = await prisma.approvalTemplate.findMany({
+      where,
+      include: {
+        formTemplate: {
+          select: { id: true, name: true, icon: true }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            nickname: true,
+            avatar: true
+          }
+        },
+        _count: {
+          select: {
+            nodes: true,
+            instances: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    const data = templates.map(t => ({
+      id: t.id,
+      formTemplateId: t.formTemplateId,
+      formTemplate: t.formTemplate,
+      teamId: t.teamId,
+      name: t.name,
+      description: t.description,
+      isEnabled: t.isEnabled,
+      timeoutHours: t.timeoutHours,
+      createdById: t.createdById,
+      createdBy: t.createdBy,
+      nodeCount: t._count.nodes,
+      instanceCount: t._count.instances,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt
+    }))
+
+    res.json({ success: true, data })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.get('/form/:formTemplateId', auth, async (req, res) => {
   try {
     const { formTemplateId } = req.params

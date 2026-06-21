@@ -283,7 +283,41 @@ router.get('/pending', auth, async (req, res) => {
       createdAt: task.approvalInstance.createdAt
     }))
 
-    res.json({ success: true, data: { list: data, total, page: Number(page), pageSize: Number(pageSize) } })
+    res.json({ success: true, data: { list: data, items: data, total, page: Number(page), pageSize: Number(pageSize) } })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.get('/initiated', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { page = 1, pageSize = 20, status } = req.query
+
+    const skip = (Number(page) - 1) * Number(pageSize)
+    const take = Number(pageSize)
+
+    const where = {
+      initiatorId: userId
+    }
+    if (status) where.status = status
+
+    const [instances, total] = await Promise.all([
+      prisma.approvalInstance.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          initiator: { select: userSelect },
+          formTemplate: { select: { id: true, name: true, icon: true } },
+          currentNode: { select: { id: true, nodeName: true } }
+        }
+      }),
+      prisma.approvalInstance.count({ where })
+    ])
+
+    res.json({ success: true, data: { list: instances, items: instances, total, page: Number(page), pageSize: Number(pageSize) } })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
@@ -317,7 +351,106 @@ router.get('/submitted', auth, async (req, res) => {
       prisma.approvalInstance.count({ where })
     ])
 
-    res.json({ success: true, data: { list: instances, total, page: Number(page), pageSize: Number(pageSize) } })
+    res.json({ success: true, data: { list: instances, items: instances, total, page: Number(page), pageSize: Number(pageSize) } })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.get('/approved', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { page = 1, pageSize = 20, status } = req.query
+
+    const skip = (Number(page) - 1) * Number(pageSize)
+    const take = Number(pageSize)
+
+    const taskWhere = {
+      assigneeId: userId,
+      NOT: { status: 'pending' }
+    }
+
+    const [tasks, total] = await Promise.all([
+      prisma.approvalTask.findMany({
+        where: taskWhere,
+        skip,
+        take,
+        orderBy: { actedAt: 'desc' },
+        include: {
+          approvalInstance: {
+            include: {
+              initiator: { select: userSelect },
+              formTemplate: { select: { id: true, name: true, icon: true } },
+              currentNode: { select: { id: true, nodeName: true } }
+            }
+          }
+        },
+        distinct: ['approvalInstanceId']
+      }),
+      prisma.approvalTask.count({ where: taskWhere })
+    ])
+
+    const instances = tasks.map(task => ({
+      ...task.approvalInstance,
+      taskId: task.id,
+      taskStatus: task.status,
+      taskAction: task.action,
+      taskComment: task.comment,
+      actedAt: task.actedAt
+    }))
+
+    res.json({ success: true, data: { list: instances, items: instances, total, page: Number(page), pageSize: Number(pageSize) } })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.get('/mine', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { page = 1, pageSize = 20, status } = req.query
+
+    const skip = (Number(page) - 1) * Number(pageSize)
+    const take = Number(pageSize)
+
+    const taskWhere = {
+      assigneeId: userId,
+      NOT: { status: 'pending' }
+    }
+    if (status) {
+      taskWhere.status = status
+    }
+
+    const [tasks, total] = await Promise.all([
+      prisma.approvalTask.findMany({
+        where: taskWhere,
+        skip,
+        take,
+        orderBy: { actedAt: 'desc' },
+        include: {
+          approvalInstance: {
+            include: {
+              initiator: { select: userSelect },
+              formTemplate: { select: { id: true, name: true, icon: true } },
+              currentNode: { select: { id: true, nodeName: true } }
+            }
+          }
+        },
+        distinct: ['approvalInstanceId']
+      }),
+      prisma.approvalTask.count({ where: taskWhere })
+    ])
+
+    const instances = tasks.map(task => ({
+      ...task.approvalInstance,
+      taskId: task.id,
+      taskStatus: task.status,
+      taskAction: task.action,
+      taskComment: task.comment,
+      actedAt: task.actedAt
+    }))
+
+    res.json({ success: true, data: { list: instances, items: instances, total, page: Number(page), pageSize: Number(pageSize) } })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
@@ -356,7 +489,7 @@ router.get('/cc', auth, async (req, res) => {
       readAt: cc.readAt
     }))
 
-    res.json({ success: true, data: { list: data, total, page: Number(page), pageSize: Number(pageSize) } })
+    res.json({ success: true, data: { list: data, items: data, total, page: Number(page), pageSize: Number(pageSize) } })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
