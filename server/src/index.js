@@ -62,9 +62,10 @@ app.use('/api/documents', documentsRouter)
 app.use('/api/doc-comments', docCommentsRouter)
 app.use('/api/doc-share', docShareRouter)
 app.use('/api/form-templates', formTemplatesRouter)
-app.use('/api/approval-instances', approvalInstancesRouter)
-app.use('/api/approval-notifications', approvalNotificationsRouter)
 app.use('/api/approval-templates', approvalTemplatesRouter)
+app.use('/api/approval-instances', approvalInstancesRouter)
+app.use('/api/approval-tasks', approvalTasksRouter)
+app.use('/api/approval-notifications', approvalNotificationsRouter)
 
 app.use((err, req, res, next) => {
   console.error(err.stack)
