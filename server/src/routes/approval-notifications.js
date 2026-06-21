@@ -103,7 +103,40 @@ router.get('/unread-count', auth, async (req, res) => {
   }
 })
 
-router.put('/:id/read', auth, async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const notification = await prisma.approvalNotification.findUnique({
+      where: { id },
+      include: {
+        approvalInstance: {
+          include: {
+            initiator: {
+              select: { id: true, nickname: true, avatar: true }
+            }
+          }
+        },
+        approvalTask: true
+      }
+    })
+
+    if (!notification) {
+      return res.status(404).json({ success: false, message: '通知不存在' })
+    }
+
+    if (notification.userId !== userId) {
+      return res.status(403).json({ success: false, message: '您没有权限查看此通知' })
+    }
+
+    res.json({ success: true, data: notification })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+const markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params
     const userId = req.user.userId
@@ -132,13 +165,16 @@ router.put('/:id/read', auth, async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
-})
+}
 
-router.put('/read-all', auth, async (req, res) => {
+router.put('/:id/read', auth, markNotificationRead)
+router.post('/:id/read', auth, markNotificationRead)
+
+const markAllNotificationsRead = async (req, res) => {
   try {
     const userId = req.user.userId
 
-    await prisma.approvalNotification.updateMany({
+    const result = await prisma.approvalNotification.updateMany({
       where: {
         userId,
         isRead: false
@@ -149,7 +185,24 @@ router.put('/read-all', auth, async (req, res) => {
       }
     })
 
-    res.json({ success: true, data: { message: '已全部标记为已读' } })
+    res.json({ success: true, data: { updatedCount: result.count } })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+router.put('/read-all', auth, markAllNotificationsRead)
+router.post('/read-all', auth, markAllNotificationsRead)
+
+router.delete('/all', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+
+    const result = await prisma.approvalNotification.deleteMany({
+      where: { userId }
+    })
+
+    res.json({ success: true, data: { deletedCount: result.count } })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

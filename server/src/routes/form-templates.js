@@ -307,6 +307,32 @@ router.delete('/:id', auth, async (req, res) => {
   }
 })
 
+router.get('/:id/fields', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const template = await prisma.formTemplate.findUnique({ where: { id } })
+
+    if (!template) {
+      return res.status(404).json({ success: false, message: '表单模板不存在' })
+    }
+
+    if (!await checkTeamMember(userId, template.teamId)) {
+      return res.status(403).json({ success: false, message: '您不是该团队成员' })
+    }
+
+    const fields = await prisma.formField.findMany({
+      where: { formTemplateId: id },
+      orderBy: { sortOrder: 'asc' }
+    })
+
+    res.json({ success: true, data: fields.map(f => parseFormField(f)) })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.post('/:id/fields', auth, async (req, res) => {
   try {
     const { id } = req.params
@@ -445,7 +471,7 @@ router.put('/:id/fields', auth, async (req, res) => {
     const { fields } = req.body
 
     if (!fields || !Array.isArray(fields)) {
-      return res.status(400).json({ success: false, message: '请提供字段排序数据' })
+      return res.status(400).json({ success: false, message: '请提供字段数据' })
     }
 
     const template = await prisma.formTemplate.findUnique({ where: { id } })
@@ -458,26 +484,115 @@ router.put('/:id/fields', auth, async (req, res) => {
       return res.status(403).json({ success: false, message: '您不是该团队成员' })
     }
 
+    for (const field of fields) {
+      const error = validateField(field)
+      if (error) {
+        return res.status(400).json({ success: false, message: error })
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
-      for (const item of fields) {
-        if (item.id && item.sortOrder !== undefined) {
-          await tx.formField.update({
-            where: { id: item.id },
-            data: { sortOrder: item.sortOrder }
-          })
-        }
+      await tx.formField.deleteMany({
+        where: { formTemplateId: id }
+      })
+
+      for (const field of fields) {
+        await tx.formField.create({
+          data: {
+            ...fieldInputToData(field),
+            formTemplateId: id
+          }
+        })
       }
     })
 
-    const updatedFields = await prisma.formField.findMany({
+    const createdFields = await prisma.formField.findMany({
       where: { formTemplateId: id },
       orderBy: { sortOrder: 'asc' }
     })
 
+    res.json({ success: true, data: createdFields.map(f => parseFormField(f)) })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.get('/:formTemplateId/records', auth, async (req, res) => {
+  try {
+    const { formTemplateId } = req.params
+    const { page = 1, pageSize = 20 } = req.query
+    const userId = req.user.userId
+
+    const template = await prisma.formTemplate.findUnique({ where: { id: formTemplateId } })
+
+    if (!template) {
+      return res.status(404).json({ success: false, message: '表单模板不存在' })
+    }
+
+    if (!await checkTeamMember(userId, template.teamId)) {
+      return res.status(403).json({ success: false, message: '您不是该团队成员' })
+    }
+
+    const skip = (Number(page) - 1) * Number(pageSize)
+    const take = Number(pageSize)
+
+    const [records, total] = await Promise.all([
+      prisma.formRecord.findMany({
+        where: { formTemplateId },
+        include: {
+          submitter: {
+            select: { id: true, nickname: true, avatar: true, email: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take
+      }),
+      prisma.formRecord.count({ where: { formTemplateId } })
+    ])
+
     res.json({
       success: true,
-      data: updatedFields.map(f => parseFormField(f))
+      data: { list: records, items: records, total, page: Number(page), pageSize: Number(pageSize) }
     })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.post('/:formTemplateId/records', auth, async (req, res) => {
+  try {
+    const { formTemplateId } = req.params
+    const { formData } = req.body
+    const userId = req.user.userId
+
+    const template = await prisma.formTemplate.findUnique({ where: { id: formTemplateId } })
+
+    if (!template) {
+      return res.status(404).json({ success: false, message: '表单模板不存在' })
+    }
+
+    if (!await checkTeamMember(userId, template.teamId)) {
+      return res.status(403).json({ success: false, message: '您不是该团队成员' })
+    }
+
+    const record = await prisma.formRecord.create({
+      data: {
+        formTemplateId,
+        submitterId: userId,
+        teamId: template.teamId,
+        formData: typeof formData === 'object' ? JSON.stringify(formData) : formData,
+        status: 'submitted',
+        submittedAt: new Date()
+      },
+      include: {
+        submitter: {
+          select: { id: true, nickname: true, avatar: true, email: true }
+        }
+      }
+    })
+
+    res.json({ success: true, data: record })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

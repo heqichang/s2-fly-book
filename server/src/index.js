@@ -19,6 +19,8 @@ import approvalTemplatesRouter from './routes/approval-templates.js'
 import approvalInstancesRouter from './routes/approval-instances.js'
 import approvalTasksRouter from './routes/approval-tasks.js'
 import approvalNotificationsRouter from './routes/approval-notifications.js'
+import approvalCcsRouter from './routes/approval-ccs.js'
+import formRecordsRouter from './routes/form-records.js'
 
 import { setupSocketHandlers } from './socket/handler.js'
 
@@ -66,6 +68,8 @@ app.use('/api/approval-templates', approvalTemplatesRouter)
 app.use('/api/approval-instances', approvalInstancesRouter)
 app.use('/api/approval-tasks', approvalTasksRouter)
 app.use('/api/approval-notifications', approvalNotificationsRouter)
+app.use('/api/approval-ccs', approvalCcsRouter)
+app.use('/api/form-records', formRecordsRouter)
 
 app.use((err, req, res, next) => {
   console.error(err.stack)

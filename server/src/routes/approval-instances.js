@@ -1402,6 +1402,142 @@ router.post('/:id/comments', auth, async (req, res) => {
   }
 })
 
+router.get('/:id/tasks', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const instance = await prisma.approvalInstance.findUnique({
+      where: { id }
+    })
+
+    if (!instance) {
+      return res.status(404).json({ success: false, message: '审批实例不存在' })
+    }
+
+    const isInitiator = instance.initiatorId === userId
+    const isInTask = await prisma.approvalTask.findFirst({
+      where: { approvalInstanceId: id, assigneeId: userId }
+    })
+    const isCc = await prisma.approvalCc.findUnique({
+      where: { approvalInstanceId_ccUserId: { approvalInstanceId: id, ccUserId: userId } }
+    })
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: instance.teamId, userId } }
+    })
+
+    if (!isInitiator && !isInTask && !isCc && !(teamMember && teamMember.role === 'admin')) {
+      return res.status(403).json({ success: false, message: '您没有权限查看此审批' })
+    }
+
+    const tasks = await prisma.approvalTask.findMany({
+      where: { approvalInstanceId: id },
+      include: {
+        assignee: { select: userSelect },
+        approvalNode: { select: { id: true, nodeName: true, nodeType: true } }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    res.json({ success: true, data: tasks })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.get('/:id/actions', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const instance = await prisma.approvalInstance.findUnique({
+      where: { id }
+    })
+
+    if (!instance) {
+      return res.status(404).json({ success: false, message: '审批实例不存在' })
+    }
+
+    const isInitiator = instance.initiatorId === userId
+    const isInTask = await prisma.approvalTask.findFirst({
+      where: { approvalInstanceId: id, assigneeId: userId }
+    })
+    const isCc = await prisma.approvalCc.findUnique({
+      where: { approvalInstanceId_ccUserId: { approvalInstanceId: id, ccUserId: userId } }
+    })
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: instance.teamId, userId } }
+    })
+
+    if (!isInitiator && !isInTask && !isCc && !(teamMember && teamMember.role === 'admin')) {
+      return res.status(403).json({ success: false, message: '您没有权限查看此审批' })
+    }
+
+    const actions = await prisma.approvalAction.findMany({
+      where: { approvalInstanceId: id },
+      include: {
+        actor: { select: userSelect }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    res.json({ success: true, data: actions })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.get('/:id/comments', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const instance = await prisma.approvalInstance.findUnique({
+      where: { id }
+    })
+
+    if (!instance) {
+      return res.status(404).json({ success: false, message: '审批实例不存在' })
+    }
+
+    const isInitiator = instance.initiatorId === userId
+    const isInTask = await prisma.approvalTask.findFirst({
+      where: { approvalInstanceId: id, assigneeId: userId }
+    })
+    const isCc = await prisma.approvalCc.findUnique({
+      where: { approvalInstanceId_ccUserId: { approvalInstanceId: id, ccUserId: userId } }
+    })
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: instance.teamId, userId } }
+    })
+
+    if (!isInitiator && !isInTask && !isCc && !(teamMember && teamMember.role === 'admin')) {
+      return res.status(403).json({ success: false, message: '您没有权限查看此审批' })
+    }
+
+    const comments = await prisma.approvalComment.findMany({
+      where: { approvalInstanceId: id, parentId: null },
+      include: {
+        commenter: { select: userSelect },
+        replies: {
+          include: {
+            commenter: { select: userSelect }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    res.json({ success: true, data: comments })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.get('/:id/timeline', auth, async (req, res) => {
   try {
     const { id } = req.params

@@ -483,6 +483,105 @@ router.delete('/:id', auth, async (req, res) => {
   }
 })
 
+router.get('/:id/nodes', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const template = await prisma.approvalTemplate.findUnique({
+      where: { id }
+    })
+
+    if (!template) {
+      return res.status(404).json({ success: false, message: '审批模板不存在' })
+    }
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: template.teamId, userId } }
+    })
+
+    if (!teamMember) {
+      return res.status(403).json({ success: false, message: '您不是该团队成员' })
+    }
+
+    const nodes = await prisma.approvalNode.findMany({
+      where: { approvalTemplateId: id },
+      orderBy: { sortOrder: 'asc' }
+    })
+
+    res.json({ success: true, data: nodes.map(serializeNode) })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.put('/:id/nodes', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { nodes } = req.body
+    const userId = req.user.userId
+
+    if (!nodes || !Array.isArray(nodes)) {
+      return res.status(400).json({ success: false, message: '请提供节点数据' })
+    }
+
+    const template = await prisma.approvalTemplate.findUnique({
+      where: { id }
+    })
+
+    if (!template) {
+      return res.status(404).json({ success: false, message: '审批模板不存在' })
+    }
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId: template.teamId, userId } }
+    })
+
+    if (!teamMember || teamMember.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '您没有权限修改节点' })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.approvalNode.deleteMany({
+        where: { approvalTemplateId: id }
+      })
+
+      for (const node of nodes) {
+        const nodeData = prepareNodeData({
+          parentNodeId: node.parentNodeId,
+          nodeType: node.nodeType,
+          nodeName: node.nodeName,
+          sortOrder: node.sortOrder || 0,
+          assigneeType: node.assigneeType,
+          assigneeIds: node.assigneeIds,
+          assigneeFieldKey: node.assigneeFieldKey,
+          signType: node.signType,
+          conditionExpression: node.conditionExpression,
+          autoAction: node.autoAction,
+          ccUserIds: node.ccUserIds,
+          config: node.config
+        })
+
+        await tx.approvalNode.create({
+          data: {
+            approvalTemplateId: id,
+            ...nodeData
+          }
+        })
+      }
+    })
+
+    const createdNodes = await prisma.approvalNode.findMany({
+      where: { approvalTemplateId: id },
+      orderBy: { sortOrder: 'asc' }
+    })
+
+    res.json({ success: true, data: createdNodes.map(serializeNode) })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 router.post('/:id/nodes', auth, async (req, res) => {
   try {
     const { id } = req.params
