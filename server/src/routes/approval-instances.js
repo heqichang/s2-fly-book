@@ -40,6 +40,16 @@ const parseJsonField = (field) => {
   }
 }
 
+const parseFormField = (field) => {
+  if (!field) return null
+  return {
+    ...field,
+    options: field.options ? parseJsonField(field.options) : null,
+    validation: field.validation ? parseJsonField(field.validation) : null,
+    config: field.config ? parseJsonField(field.config) : null
+  }
+}
+
 const getNodeAssignees = (node, formData) => {
   const assigneeType = node.assigneeType
   const assigneeIds = parseJsonField(node.assigneeIds) || []
@@ -617,6 +627,10 @@ router.get('/:id', auth, async (req, res) => {
     const data = {
       ...instance,
       formData,
+      formTemplate: {
+        ...instance.formTemplate,
+        fields: instance.formTemplate?.fields?.map(f => parseFormField(f)) || []
+      },
       isInitiator,
       isInTask,
       isCc,

@@ -4,6 +4,25 @@ import auth from '../middleware/auth.js'
 
 const router = Router()
 
+const parseJsonField = (field) => {
+  if (!field) return null
+  try {
+    return JSON.parse(field)
+  } catch {
+    return field
+  }
+}
+
+const parseFormField = (field) => {
+  if (!field) return null
+  return {
+    ...field,
+    options: field.options ? parseJsonField(field.options) : null,
+    validation: field.validation ? parseJsonField(field.validation) : null,
+    config: field.config ? parseJsonField(field.config) : null
+  }
+}
+
 const checkTeamMember = async (userId, teamId) => {
   const member = await prisma.teamMember.findUnique({
     where: {
@@ -49,7 +68,16 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(403).json({ success: false, message: '您不是该团队成员' })
     }
 
-    res.json({ success: true, data: record })
+    const data = {
+      ...record,
+      formData: parseJsonField(record.formData),
+      formTemplate: {
+        ...record.formTemplate,
+        fields: record.formTemplate?.fields?.map(f => parseFormField(f)) || []
+      }
+    }
+
+    res.json({ success: true, data })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

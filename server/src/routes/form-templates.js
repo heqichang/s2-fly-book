@@ -551,9 +551,14 @@ router.get('/:formTemplateId/records', auth, async (req, res) => {
       prisma.formRecord.count({ where: { formTemplateId } })
     ])
 
+    const parsedRecords = records.map(r => ({
+      ...r,
+      formData: parseJsonField(r.formData)
+    }))
+
     res.json({
       success: true,
-      data: { list: records, items: records, total, page: Number(page), pageSize: Number(pageSize) }
+      data: { list: parsedRecords, items: parsedRecords, total, page: Number(page), pageSize: Number(pageSize) }
     })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
